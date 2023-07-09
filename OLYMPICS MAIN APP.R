@@ -158,11 +158,11 @@ ui <- bootstrapPage(
             ),
             selectizeInput(
               "region", 
-              "Select Country",
+              "Select Team",
               choices = NULL,
               multiple = TRUE,
               options = list(
-                placeholder = 'All Country',
+                placeholder = 'All Team',
                 plugins = list('remove_button')
               )
             )
@@ -184,12 +184,13 @@ ui <- bootstrapPage(
           
           absolutePanel(
             id = "histogram", class = "panel panel-default",
-            top = "40%", right = "1%", width = 400, fixed=TRUE,
+            top = "44%", right = "1%", width = 400, fixed=TRUE,
             draggable = TRUE, height = "auto",
-            HTML('<button data-toggle="collapse" data-target="#demo">x</button>'),
+            HTML('<button data-toggle="collapse" data-target="#demo" class="btn btn-link btn-block">'),
+            textOutput("histogram_medal_title"), 
+            HTML('</button>'),
             tags$div(id = 'demo',  class="collapse in",
-                     plotlyOutput("histogram_medal"),
-                     h4(textOutput("histogram_medal_title"), align = "center")
+                     plotlyOutput("histogram_medal")
             )
           )
           
@@ -313,7 +314,7 @@ ui <- bootstrapPage(
         tags$b("Spatial Data for Choropleth: "), 
         tags$a(href="https://thematicmapping.org/downloads/world_borders.php", "World Borders Dataset"),tags$br(),
         tags$br(),tags$br(),tags$h4("Contact"),
-        "mikael.adisurya@gmail.com",tags$br(),tags$br(),
+        "mikael.adisurya@gmail.com",tags$br(),tags$br()
       )
     ) # tabpanel
     
@@ -462,7 +463,7 @@ server = function(input, output, session) {
     
     if (input$medal == "All Medals") {
       pie_chartdata <- select(world_spdf@data, Gold, Silver, Bronze)
-      medal_pick = input$medal
+      medal_pick='Total_Medals'
       pie_color <- c("darkgoldenrod", "darkgrey", "sienna")
     } else if (input$medal == "Gold") {
       pie_chartdata <- select(world_spdf@data, Gold)
@@ -503,6 +504,7 @@ server = function(input, output, session) {
           fillOpacity = 0.9, 
           color="white", 
           weight=0.3,
+          popup = mytext,
           label = mytext,
           labelOptions = labelOptions( 
             style = list("font-weight" = "normal", padding = "3px 8px"), 
@@ -519,7 +521,7 @@ server = function(input, output, session) {
         ) %>%
         addLegend( pal=mypalette, values=~count, opacity=0.9, title = "Age (Years)", position = "bottomleft" )
       
-      ## ----WEIGHT-------------------------------------------------------------
+      ## ----HEIGHT-------------------------------------------------------------
     } else if (input$attribute == "Height") {
       mybins <- c(NA, 160, 165, 170, 175, 180, 185, 190, Inf)
       mypalette <- colorBin( palette="YlGnBu", domain=world_spdf@data$Height, na.color="transparent", bins=mybins)
@@ -541,6 +543,7 @@ server = function(input, output, session) {
           color="white", 
           weight=0.3,
           label = mytext,
+          popup = mytext,
           labelOptions = labelOptions( 
             style = list("font-weight" = "normal", padding = "3px 8px"), 
             textsize = "13px", 
@@ -578,6 +581,7 @@ server = function(input, output, session) {
           color="white", 
           weight=0.3,
           label = mytext,
+          popup = mytext,
           labelOptions = labelOptions( 
             style = list("font-weight" = "normal", padding = "3px 8px"), 
             textsize = "13px", 
@@ -615,6 +619,7 @@ server = function(input, output, session) {
           color="white", 
           weight=0.3,
           label = mytext,
+          popup = mytext,
           labelOptions = labelOptions( 
             style = list("font-weight" = "normal", padding = "3px 8px"), 
             textsize = "13px", 
@@ -636,7 +641,7 @@ server = function(input, output, session) {
   
   #----HISTOGRAM----------------------------------------------------------------
   output$histogram_medal_title <- renderText({
-    paste("Distribution of ", input$medal, " Winners by ", input$attribute)
+    paste(input$attribute, "'s Distribution of ", input$medal, " Winners")
   })
   
   output$histogram_medal <- renderPlotly({
@@ -644,7 +649,10 @@ server = function(input, output, session) {
     # produce the histogram
     plot_ly(data = filtered_data(), x = ~filtered_data()[[input$attribute]], 
             type = "histogram", nbinsx = 30, 
-            marker = list(color = bin_color(), line = list(color = "cadetblue",width = 2))) %>%
+            marker = list(color = bin_color(), line = list(color = "cadetblue",width = 2)),hoverinfo = 'text',
+            text = ~paste('</br> Age: ', Age,
+                          '</br> Count: ', Age)
+            ) %>%
       layout(
         xaxis = list(title = input$attribute),
         yaxis = list(title = "Count")
