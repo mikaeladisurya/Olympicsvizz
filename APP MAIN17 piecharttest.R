@@ -2,6 +2,8 @@ library(shiny)
 library(shinythemes)
 library(shinyWidgets)
 library(leaflet)
+library(leaflet.minicharts)
+library(magrittr)
 library(plotly)
 library(dplyr)
 library(tidyverse)
@@ -71,6 +73,8 @@ medal_avg_country <- medal_per_country %>%
             rbronze_avg = round(mean(rbronze), 2))
 
 host_country <- merge(x = host_country, y = medal_avg_country, by = "Year", all.x = TRUE)
+
+minitest_data = read.csv("DATA/sales_minichart.csv",header=TRUE)
 
 ### SHINY UI ###
 ui <- bootstrapPage(
@@ -336,15 +340,8 @@ server = function(input, output, session) {
       TRUE ~ "steelblue")
   })
   
-  
   #----CHOROPLET----------------------------------------------------------------
   output$choro_map <- renderLeaflet({
-    
-    if (input$medal == "All Medals") {
-      medal_pick='Total_Medals'
-    } else {
-      medal_pick=input$medal
-    }
     
     # put reactive to dataframe so we can subset in the next step
     filtered_data <- filtered_data()
@@ -388,16 +385,14 @@ server = function(input, output, session) {
       group_by(ISO, Medal) %>%
       summarize(Count = n()) %>%
       pivot_wider(names_from = Medal, values_from = Count, values_fill = 0)
-    if (input$medal == "All Medals") {
-      # Add a new column for total medal count
-      medal_counts <- medal_counts %>%
-        mutate(
-          # add with if there is no of gold, silver or bronze column then 0
-          Total_Medals = ifelse("Bronze" %in% names(.), Bronze, 0) + 
-            ifelse("Gold" %in% names(.), Gold, 0) +
-            ifelse("Silver" %in% names(.), Silver, 0)
-        )
-    }
+    # Add a new column for total medal count
+    medal_counts <- medal_counts %>%
+      mutate(
+        # add with if there is no of gold, silver or bronze column then 0
+        Total_Medals = ifelse("Bronze" %in% names(.), Bronze, 0) + 
+          ifelse("Gold" %in% names(.), Gold, 0) +
+          ifelse("Silver" %in% names(.), Silver, 0)
+      )
     
     # try putting count data to spatial
     world_spdf@data = data.frame(world_spdf@data, age_per_noc[match(world_spdf@data[["ISO3"]], age_per_noc[["ISO"]]),],
@@ -406,11 +401,31 @@ server = function(input, output, session) {
                                  bmi_per_noc[match(world_spdf@data[["ISO3"]], bmi_per_noc[["ISO"]]),],
                                  medal_counts[match(world_spdf@data[["ISO3"]], medal_counts[["ISO"]]),])
     
+    world_spdf@data[is.na(world_spdf@data)] <- 0
+    
+    if (input$medal == "All Medals") {
+      pie_chartdata <- select(world_spdf@data, Gold, Silver, Bronze)
+      medal_pick = input$medal
+      pie_color <- c("darkgoldenrod", "darkgrey", "sienna")
+    } else if (input$medal == "Gold") {
+      pie_chartdata <- select(world_spdf@data, Gold)
+      pie_color <- "darkgoldenrod"
+      medal_pick = input$medal
+    } else if (input$medal == "Silver") {
+      pie_chartdata <- select(world_spdf@data, Silver)
+      pie_color <- "darkgrey"
+      medal_pick = input$medal
+    } else if (input$medal == "Bronze") {
+      pie_chartdata <- select(world_spdf@data, Bronze)
+      pie_color <- "sienna"
+      medal_pick = input$medal
+    }
+    
     # #----Start plotting for Choropleth-----------------------------------
     ## ----AGE-------------------------------------------------------------
     if (input$attribute == "Age") {
       mybins <- c(NA, 18, 20, 22, 24, 26, 28, 30, Inf)
-      mypalette <- colorBin( palette="YlOrBr", domain=world_spdf@data$Age, na.color="transparent", bins=mybins)
+      mypalette <- colorBin( palette="YlGnBu", domain=world_spdf@data$Age, na.color="transparent", bins=mybins)
       
       # Prepare the text for tooltips:
       mytext <- paste(
@@ -421,7 +436,7 @@ server = function(input, output, session) {
         lapply(htmltools::HTML)
       
       # Final Map
-      leaflet(world_spdf) %>% 
+      base_choro <- leaflet(world_spdf) %>% 
         addTiles()  %>% 
         setView( lat=10, lng=0 , zoom=2) %>%
         addPolygons( 
@@ -437,17 +452,19 @@ server = function(input, output, session) {
             direction = "auto"
           )
         ) %>%
-        addCircleMarkers(~LON, ~LAT,
-                         fillColor = bin_color(), fillOpacity = 0.8, color="white", radius=~log2(world_spdf@data[[medal_pick]]), stroke=FALSE,
-                         label = mytext,
-                         labelOptions = labelOptions( style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "13px", direction = "auto")
+        addMinicharts(
+          world_spdf@data$LON, world_spdf@data$LAT,
+          type = "pie", chartdata = pie_chartdata, 
+          fillColor = pie_color, colorPalette = pie_color, opacity = 0.8,
+          width = 60 * sqrt(world_spdf@data$Total_Medals) / sqrt(max(world_spdf@data$Total_Medals)),
+          transitionTime = 750, legendPosition = "bottomleft"
         ) %>%
         addLegend( pal=mypalette, values=~count, opacity=0.9, title = "Age (Years)", position = "bottomleft" )
       
       ## ----WEIGHT-------------------------------------------------------------
     } else if (input$attribute == "Height") {
       mybins <- c(NA, 160, 165, 170, 175, 180, 185, 190, Inf)
-      mypalette <- colorBin( palette="YlOrBr", domain=world_spdf@data$Height, na.color="transparent", bins=mybins)
+      mypalette <- colorBin( palette="YlGnBu", domain=world_spdf@data$Height, na.color="transparent", bins=mybins)
       
       # Prepare the text for tooltips:
       mytext <- paste(
@@ -458,7 +475,7 @@ server = function(input, output, session) {
         lapply(htmltools::HTML)
       
       # Final Map
-      leaflet(world_spdf) %>% 
+      base_choro <- leaflet(world_spdf) %>% 
         addTiles()  %>% 
         setView( lat=10, lng=0 , zoom=2) %>%
         addPolygons( 
@@ -474,17 +491,19 @@ server = function(input, output, session) {
             direction = "auto"
           )
         ) %>%
-        addCircleMarkers(~LON, ~LAT,
-                         fillColor = bin_color(), fillOpacity = 0.8, color="white", radius=~log2(world_spdf@data[[medal_pick]]), stroke=FALSE,
-                         label = mytext,
-                         labelOptions = labelOptions( style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "13px", direction = "auto")
+        addMinicharts(
+          world_spdf@data$LON, world_spdf@data$LAT,
+          type = "pie", chartdata = pie_chartdata, 
+          fillColor = pie_color, colorPalette = pie_color, opacity = 0.8,
+          width = 60 * sqrt(world_spdf@data$Total_Medals) / sqrt(max(world_spdf@data$Total_Medals)),
+          transitionTime = 750, legendPosition = "bottomleft"
         ) %>%
         addLegend( pal=mypalette, values=~count, opacity=0.9, title = "Height (cm)", position = "bottomleft" )
       
       ## ----WEIGHT-------------------------------------------------------------
     } else if (input$attribute == "Weight") {
       mybins <- c(NA, 55, 62, 69, 76, 83, 90, Inf)
-      mypalette <- colorBin( palette="YlOrBr", domain=world_spdf@data$Weight, na.color="transparent", bins=mybins)
+      mypalette <- colorBin( palette="YlGnBu", domain=world_spdf@data$Weight, na.color="transparent", bins=mybins)
       
       # Prepare the text for tooltips:
       mytext <- paste(
@@ -495,7 +514,7 @@ server = function(input, output, session) {
         lapply(htmltools::HTML)
       
       # Final Map
-      leaflet(world_spdf) %>% 
+      base_choro <- leaflet(world_spdf) %>% 
         addTiles()  %>% 
         setView( lat=10, lng=0 , zoom=2) %>%
         addPolygons( 
@@ -511,17 +530,19 @@ server = function(input, output, session) {
             direction = "auto"
           )
         ) %>%
-        addCircleMarkers(~LON, ~LAT,
-                         fillColor = bin_color(), fillOpacity = 0.8, color="white", radius=~log2(world_spdf@data[[medal_pick]]), stroke=FALSE,
-                         label = mytext,
-                         labelOptions = labelOptions( style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "13px", direction = "auto")
+        addMinicharts(
+          world_spdf@data$LON, world_spdf@data$LAT,
+          type = "pie", chartdata = pie_chartdata, 
+          fillColor = pie_color, colorPalette = pie_color, opacity = 0.8,
+          width = 60 * sqrt(world_spdf@data$Total_Medals) / sqrt(max(world_spdf@data$Total_Medals)),
+          transitionTime = 750, legendPosition = "bottomleft"
         ) %>%
         addLegend( pal=mypalette, values=~count, opacity=0.9, title = "Weight (Kg)", position = "bottomleft" )
       
       ## ----BMI-------------------------------------------------------------
     } else if (input$attribute == "BMI") {
       mybins <- c(NA, 20, 21, 22, 23, 24, 25, Inf)
-      mypalette <- colorBin( palette="YlOrBr", domain=world_spdf@data$BMI, na.color="transparent", bins=mybins)
+      mypalette <- colorBin( palette="YlGnBu", domain=world_spdf@data$BMI, na.color="transparent", bins=mybins)
       
       # Prepare the text for tooltips:
       mytext <- paste(
@@ -532,7 +553,7 @@ server = function(input, output, session) {
         lapply(htmltools::HTML)
       
       # Final Map
-      leaflet(world_spdf) %>% 
+      base_choro <- leaflet(world_spdf) %>% 
         addTiles()  %>% 
         setView( lat=10, lng=0 , zoom=2) %>%
         addPolygons( 
@@ -548,24 +569,16 @@ server = function(input, output, session) {
             direction = "auto"
           )
         ) %>%
-        addCircleMarkers(~LON, ~LAT,
-                         fillColor = bin_color(), fillOpacity = 0.8, color="white", radius=~log2(world_spdf@data[[medal_pick]]), stroke=FALSE,
-                         label = mytext,
-                         labelOptions = labelOptions( style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "13px", direction = "auto")
+        addMinicharts(
+          world_spdf@data$LON, world_spdf@data$LAT,
+          type = "pie", chartdata = pie_chartdata, 
+          fillColor = pie_color, colorPalette = pie_color, opacity = 0.8,
+          width = 60 * sqrt(world_spdf@data$Total_Medals) / sqrt(max(world_spdf@data$Total_Medals)),
+          transitionTime = 750, legendPosition = "bottomleft"
         ) %>%
         addLegend( pal=mypalette, values=~count, opacity=0.9, title = "BMI (Kg/M2)", position = "bottomleft" )
     }
     
-    colors <- c("#4fc13c", "#cccccc", "#cccc2c")
-    
-    leaflet(world_spdf) %>%
-      addMinicharts(
-        ~LON, ~LAT,
-        type = "pie",
-        chartdata = world_spdf@data[, c("Gold", "Silver", "Bronze")], 
-        colorPalette = colors, 
-        width = 60 * 0.8, transitionTime = 0
-      )
     
   })# output renderleaflet choropleth
   

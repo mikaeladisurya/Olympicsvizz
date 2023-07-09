@@ -138,3 +138,69 @@ medal_counts_try <- filter_age %>%
   summarize(Count = n()) %>%
   pivot_wider(names_from = Medal, values_from = Count, values_fill = 0)
 
+
+##------------------------------------------------------------------------------
+
+# put reactive to dataframe so we can subset in the next step
+filtered_data <- summer_olympic
+
+##----Preparing world spdf for filtering------------------------------------
+# https://statisticsglobe.com/mean-by-group-in-r
+# filter age data from na value, then create dataframe for each noc age mean rounded 2 decimal
+filter_age <- filtered_data[!is.na(filtered_data$Age),]
+if (nrow(filter_age) > 0) {
+  age_per_noc <- aggregate(Age ~ ISO, data = filter_age, FUN = function(x) round(mean(x), 2))
+} else {
+  age_per_noc <- data.frame(ISO = character(), Age = numeric())
+}
+
+# filter height data from na value, then create dataframe for each noc height mean rounded 2 decimal
+filter_height <- filtered_data[!is.na(filtered_data$Height),]
+if (nrow(filter_height) > 0) {
+  height_per_noc <- aggregate(Height ~ ISO, data = filter_height, FUN = function(x) round(mean(x), 2))
+} else {
+  height_per_noc <- data.frame(ISO = character(), Height = numeric())
+}
+
+# filter weight data from na value, then create dataframe for each noc weight mean rounded 2 decimal
+filter_weight <- filtered_data[!is.na(filtered_data$Weight),]
+if (nrow(filter_weight) > 0) {
+  weight_per_noc <- aggregate(Weight ~ ISO, data = filter_weight, FUN = function(x) round(mean(x), 2))
+} else {
+  weight_per_noc <- data.frame(ISO = character(), Weight = numeric())
+}
+
+# filter bmi data from na value, then create dataframe for each noc bmi mean rounded 2 decimal
+filter_bmi <- filtered_data[!is.na(filtered_data$BMI),]
+if (nrow(filter_bmi) > 0) {
+  bmi_per_noc <- aggregate(BMI ~ ISO, data = filter_bmi, FUN = function(x) round(mean(x), 2))
+} else {
+  bmi_per_noc <- data.frame(ISO = character(), BMI = numeric())
+}
+
+# Calculate the count of medals by team
+medal_counts <- filtered_data %>%
+  group_by(ISO, Medal) %>%
+  summarize(Count = n()) %>%
+  pivot_wider(names_from = Medal, values_from = Count, values_fill = 0)
+# Add a new column for total medal count
+medal_counts <- medal_counts %>%
+  mutate(
+    # add with if there is no of gold, silver or bronze column then 0
+    Total_Medals = ifelse("Bronze" %in% names(.), Bronze, 0) + 
+      ifelse("Gold" %in% names(.), Gold, 0) +
+      ifelse("Silver" %in% names(.), Silver, 0)
+  )
+
+# try putting count data to spatial
+world_spdf@data = data.frame(world_spdf@data, age_per_noc[match(world_spdf@data[["ISO3"]], age_per_noc[["ISO"]]),],
+                             height_per_noc[match(world_spdf@data[["ISO3"]], height_per_noc[["ISO"]]),], 
+                             weight_per_noc[match(world_spdf@data[["ISO3"]], weight_per_noc[["ISO"]]),],
+                             bmi_per_noc[match(world_spdf@data[["ISO3"]], bmi_per_noc[["ISO"]]),],
+                             medal_counts[match(world_spdf@data[["ISO3"]], medal_counts[["ISO"]]),])
+
+head(world_spdf@data)
+world_spdf@data$Gold
+world_spdf@data$Total_Medals
+
+world_spdf@data[is.na(world_spdf@data)] <- 0
