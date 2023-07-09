@@ -1,12 +1,37 @@
+# ----Combining from the References:---------------------
+# Lecture Notes
+# https://stackoverflow.com/questions/54816608/customizing-bin-widths-in-plotlys-histogram-function-in-r
+# https://plotly.com/r/histograms/
+# https://rpubs.com/juanhklopper/control_histogram_color_using_Plotly_for_R
+# https://appsilon.com/shiny-application-layouts/
+# https://sscc.wisc.edu/shiny/users/jstruck2/layouts/
+# https://shiny.posit.co/r/reference/shiny/1.7.2/fillpage
+# https://www.codingprof.com/how-to-create-a-slider-in-r-shiny/
+# https://shiny.posit.co/r/reference/shiny/0.11/reactivevalues
+# https://towardsdatascience.com/lollipop-dumbbell-charts-with-plotly-696039d5f85
+
+# Install necessary libraries
+if(!require(shiny)) install.packages ("shiny")
+if(!require(shinythemes)) install.packages ("shinythemes")
+if(!require(shinyWidgets)) install.packages ("shinyWidgets")
+if(!require(plotly)) install.packages ("plotly")
+if(!require(dplyr)) install.packages ("dplyr")
+if(!require(tidyverse)) install.packages ("tidyverse")
+if(!require(leaflet)) install.packages ("leaflet")
+if(!require(leaflet.minicharts)) install.packages ("leaflet.minicharts")
+if(!require(magrittr)) install.packages ("magrittr")
+if(!require(rgdal)) install.packages ("rgdal")
+if(!require(DT)) install.packages ("DT")
+
 library(shiny)
 library(shinythemes)
 library(shinyWidgets)
-library(leaflet)
-library(leaflet.minicharts)
-library(magrittr)
 library(plotly)
 library(dplyr)
 library(tidyverse)
+library(leaflet)
+library(leaflet.minicharts)
+library(magrittr)
 library(rgdal)
 library(DT)
 
@@ -259,6 +284,37 @@ ui <- bootstrapPage(
           )# /main panel
         ) # /fluidrow
       )
+    ), # tabpanel
+    
+    tabPanel(
+      "About this site",
+      tags$div(
+        tags$h4("Background"), 
+        p("The Olympic Games is a unique and unparalleled global sporting event 
+          that brings together athletes from all over the world to compete on a grand stage.
+          With history spanning over a century, the Olympic Games have witnessed great achievements,
+          rivalries of countries and athletes, and some inspiring stories that have been documented as our legacy.
+          We want to delve deeper into this history, in order to reveal more Olympics secret than meets the eye.
+          We are going to try to reveal this secret by using visualization from the dataset of century old Olympics history.
+          By visualizing the dataset, this project aims to find some insight that may go unnoticed 
+          surrounded by the broader narratives of medal tallies or country superiority."),
+        tags$br(),
+        p("The dataset that we are going to visualize is from “120 years of Olympic history: athletes and results” dataset. 
+          The dataset is a comprehensive biodata on athletes and medal results in the modern Olympic Games, 
+          consisting of all the Games from the 1896 Athens edition until the 2016 Rio Game, including Summer and Winter Games.
+          It provides some valuable information about the weight, height, age, medal outcomes, 
+          and countries of each athlete who has participated in the Games"),
+        tags$br(),tags$h4("Code"),
+        "The code and input data utilized to create this Shiny mapping tool can be accessed from ",
+        tags$a(href="https://github.com/mikaeladisurya/Olympicsvizz", "Github."),
+        tags$br(),tags$br(),tags$h4("Sources"),
+        tags$b("Olympics Dataset: "), 
+        tags$a(href="https://www.kaggle.com/datasets/heesoo37/120-years-of-olympic-history-athletes-and-results", "120 years of Olympic history: athletes and results"),tags$br(),
+        tags$b("Spatial Data for Choropleth: "), 
+        tags$a(href="https://thematicmapping.org/downloads/world_borders.php", "World Borders Dataset"),tags$br(),
+        tags$br(),tags$br(),tags$h4("Contact"),
+        "mikael.adisurya@gmail.com",tags$br(),tags$br(),
+      )
     ) # tabpanel
     
   )# navbarpage
@@ -401,6 +457,7 @@ server = function(input, output, session) {
                                  bmi_per_noc[match(world_spdf@data[["ISO3"]], bmi_per_noc[["ISO"]]),],
                                  medal_counts[match(world_spdf@data[["ISO3"]], medal_counts[["ISO"]]),])
     
+    # change NA data, especially in medal data (countries that didnt participate have NA data)
     world_spdf@data[is.na(world_spdf@data)] <- 0
     
     if (input$medal == "All Medals") {
@@ -422,6 +479,9 @@ server = function(input, output, session) {
     }
     
     # #----Start plotting for Choropleth-----------------------------------
+    base_choro <- leaflet(world_spdf) %>% 
+      addTiles()  %>% 
+      setView( lat=10, lng=0 , zoom=2)
     ## ----AGE-------------------------------------------------------------
     if (input$attribute == "Age") {
       mybins <- c(NA, 18, 20, 22, 24, 26, 28, 30, Inf)
@@ -436,9 +496,7 @@ server = function(input, output, session) {
         lapply(htmltools::HTML)
       
       # Final Map
-      base_choro <- leaflet(world_spdf) %>% 
-        addTiles()  %>% 
-        setView( lat=10, lng=0 , zoom=2) %>%
+      base_choro %>%
         addPolygons( 
           fillColor = ~mypalette(Age), 
           stroke=TRUE, 
@@ -475,9 +533,7 @@ server = function(input, output, session) {
         lapply(htmltools::HTML)
       
       # Final Map
-      base_choro <- leaflet(world_spdf) %>% 
-        addTiles()  %>% 
-        setView( lat=10, lng=0 , zoom=2) %>%
+      base_choro %>%
         addPolygons( 
           fillColor = ~mypalette(Height), 
           stroke=TRUE, 
@@ -514,9 +570,7 @@ server = function(input, output, session) {
         lapply(htmltools::HTML)
       
       # Final Map
-      base_choro <- leaflet(world_spdf) %>% 
-        addTiles()  %>% 
-        setView( lat=10, lng=0 , zoom=2) %>%
+      base_choro %>%
         addPolygons( 
           fillColor = ~mypalette(Weight), 
           stroke=TRUE, 
@@ -553,9 +607,7 @@ server = function(input, output, session) {
         lapply(htmltools::HTML)
       
       # Final Map
-      base_choro <- leaflet(world_spdf) %>% 
-        addTiles()  %>% 
-        setView( lat=10, lng=0 , zoom=2) %>%
+      base_choro %>%
         addPolygons( 
           fillColor = ~mypalette(BMI), 
           stroke=TRUE, 
