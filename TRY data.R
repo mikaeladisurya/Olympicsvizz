@@ -175,12 +175,23 @@ plot_overlay <- plot_overlay %>% layout(barmode = "overlay",
 
 plot_overlay
 
-male_data <- subset(filtered_data, Sex == "M")
-attr_data <- filtered_data[, c("Age", "Sex")]
+sport_data <- filtered_data[filtered_data$Sport %in% "Basketball", ]
+
+country_data <- sport_data[sport_data$NOC %in% "CHN", ]
+
+male_data <- subset(country_data, Sex == "M")
+attr_data <- country_data[, c("Age", "Sex")]
 colnames(attr_data)[colnames(attr_data) == "Age"] <- "Property"
 
-temp_data <- filtered_data[filtered_data$Sex == "M", ]
+temp_data <- attr_data[attr_data$Sex == "M", ]
 temp_data <- temp_data[rowSums(!is.na(temp_data)) > 0, ]
+
+if (nrow(df) == 0) {
+  max_frequency <- 0
+} else {
+  max_frequency <- max(hist(female_attr_data$Property, breaks = 20, plot = FALSE)$counts)
+}
+
 
 female_attr_data <- subset(filtered_data, Sex == "F")
 female_attr_data <- female_attr_data[, c("Age", "Sex")]

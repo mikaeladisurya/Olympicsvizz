@@ -725,12 +725,26 @@ server = function(input, output, session) {
     
     # Calculate the maximum frequency for setting the range of the y-axis
     if (input$gender == "F") {
-      max_frequency <- max(hist(female_attr_data$Property, breaks = 20, plot = FALSE)$counts)
+      if (nrow(female_attr_data) == 0) {
+        max_frequency <- 10
+      } else {
+        max_frequency <- max(hist(female_attr_data$Property, breaks = 20, plot = FALSE)$counts)
+      }
     } else if (input$gender == "M") {
-      max_frequency <- max(hist(male_attr_data$Property, breaks = 20, plot = FALSE)$counts)
+      if (nrow(male_attr_data) == 0) {
+        max_frequency <- 10
+      } else {
+        max_frequency <- max(hist(male_attr_data$Property, breaks = 20, plot = FALSE)$counts)
+      }
     } else {
-      max_frequency <- max(hist(female_attr_data$Property, breaks = 20, plot = FALSE)$counts,
-                           hist(male_attr_data$Property, breaks = 20, plot = FALSE)$counts)
+      if (nrow(male_attr_data) == 0) {
+        max_frequency <- max(hist(female_attr_data$Property, breaks = 20, plot = FALSE)$counts)
+      } else if (nrow(female_attr_data) == 0) {
+        max_frequency <- max(hist(male_attr_data$Property, breaks = 20, plot = FALSE)$counts)
+      } else {
+        max_frequency <- max(hist(female_attr_data$Property, breaks = 20, plot = FALSE)$counts,
+                             hist(male_attr_data$Property, breaks = 20, plot = FALSE)$counts)
+      }
     }
     
     
