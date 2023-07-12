@@ -188,5 +188,37 @@ colnames(female_attr_data)[colnames(female_attr_data) == "Age"] <- "Property"
 
 max_frequency <- max(hist(female_attr_data$Property, breaks = 20, plot = FALSE)$counts)
 
+#-------------------------------------------------------------------------------
+# Sample data
+dataframe1 <- data.frame(
+  NOC = c("ARG", "USA", "GBR", "BRA"),
+  Gold = c(10, 21, 18, 9),
+  Silver = c(24, 32, 33, 12)
+)
+
+# Check if Gold, Silver, and Bronze columns are present
+if (!"Gold"%in% colnames(dataframe1)) {
+  dataframe1$Gold <- 0
+}
+if (!"Silver"%in% colnames(dataframe1)) {
+  dataframe1$Silver <- 0
+}
+if (!"Bronze"%in% colnames(dataframe1)) {
+  dataframe1$Bronze <- 0
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

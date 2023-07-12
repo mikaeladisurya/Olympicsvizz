@@ -165,6 +165,13 @@ ui <- bootstrapPage(
                 placeholder = 'All Team',
                 plugins = list('remove_button')
               )
+            ),
+            pickerInput(
+              "region_select", "Country/Region:",   
+              choices = NULL, 
+              options = list(`actions-box` = TRUE, `none-selected-text` = "All Teams calculated!"),
+              # selected = as.character(unique(medal_per_country[order(medal_per_country$rmedal),]$NOC))[1:10],
+              multiple = TRUE
             )
           ),
           
@@ -287,6 +294,49 @@ ui <- bootstrapPage(
       )
     ), # tabpanel
     
+    tabPanel("Region plots",
+             
+             sidebarLayout(
+               sidebarPanel(
+                 
+                 span(tags$i(h6("Reported cases are subject to significant variation in testing policy and capacity between countries.")), style="color:#045a8d"),
+                 span(tags$i(h6("Occasional anomalies (e.g. spikes in daily case counts) are generally caused by changes in case definitions.")), style="color:#045a8d"),
+                 
+                 pickerInput("level_select", "Level:",   
+                             choices = c("Global", "Continent", "Country", "US state"), 
+                             selected = c("Country"),
+                             multiple = FALSE),
+                 
+                 pickerInput("region_select", "Country/Region:",   
+                             choices = as.character(unique(summer_olympic$NOC)), 
+                             options = list(`actions-box` = TRUE, `none-selected-text` = "Please make a selection!"),
+                             selected = as.character(unique(medal_per_country[order(medal_per_country$rmedal),]$NOC))[1:10],
+                             multiple = TRUE), 
+                 
+                 pickerInput("outcome_select", "Outcome:",   
+                             choices = c("Deaths per million", "Cases per million", "Cases (total)", "Deaths (total)"), 
+                             selected = c("Deaths per million"),
+                             multiple = FALSE),
+                 
+                 pickerInput("start_date", "Plotting start date:",   
+                             choices = c("Date", "Week of 100th confirmed case", "Week of 10th death"), 
+                             options = list(`actions-box` = TRUE),
+                             selected = "Date",
+                             multiple = FALSE), 
+                 
+                 "Select outcome, regions, and plotting start date from drop-down menues to update plots. Countries with at least 1000 confirmed cases are included."
+               ),
+               
+               mainPanel(
+                 tabsetPanel(
+                   tabPanel("Cumulative", plotlyOutput("country_plot_cumulative")),
+                   tabPanel("New", plotlyOutput("country_plot")),
+                   tabPanel("Cumulative (log10)", plotlyOutput("country_plot_cumulative_log"))
+                 )
+               )
+             )
+    ),
+    
     tabPanel(
       "About this site",
       tags$div(
@@ -359,6 +409,11 @@ server = function(input, output, session) {
       updateSelectizeInput(session, 'region', 
                            choices = setNames(values_select$NOC, values_select$Team), 
                            server = TRUE)
+      choices_data <- values_select$NOC
+      names(choices_data) <- values_select$Team
+      updatePickerInput(session, 'region_select',
+                        choices = setNames(values_select$NOC, values_select$Team)
+                        )
     } else {
       temp_data <- temp_data[temp_data$NOC %in% input$region, ]
     }
@@ -394,7 +449,7 @@ server = function(input, output, session) {
       input$medal == "Gold" ~ "darkgoldenrod",
       input$medal == "Silver" ~ "darkgrey",
       input$medal == "Bronze" ~ "sienna",
-      TRUE ~ "steelblue")
+      TRUE ~ "darkturquoise")
   })
   
   #----CHOROPLET----------------------------------------------------------------
@@ -442,10 +497,22 @@ server = function(input, output, session) {
       group_by(ISO, Medal) %>%
       summarize(Count = n()) %>%
       pivot_wider(names_from = Medal, values_from = Count, values_fill = 0)
+    
+    # Check if Gold, Silver, and Bronze columns are present
+    if (!"Gold"%in% colnames(medal_counts)) {
+      medal_counts$Gold <- 0
+    }
+    if (!"Silver"%in% colnames(medal_counts)) {
+      medal_counts$Silver <- 0
+    }
+    if (!"Bronze"%in% colnames(medal_counts)) {
+      medal_counts$Bronze <- 0
+    }
+    
     # Add a new column for total medal count
     medal_counts <- medal_counts %>%
       mutate(
-        # add with if there is no of gold, silver or bronze column then 0
+        # add with if there is no of gold, silver or bronze column then 0 (old code, before adding all column)
         Total_Medals = ifelse("Bronze" %in% names(.), Bronze, 0) + 
           ifelse("Gold" %in% names(.), Gold, 0) +
           ifelse("Silver" %in% names(.), Silver, 0)
@@ -657,13 +724,20 @@ server = function(input, output, session) {
     colnames(male_attr_data)[colnames(male_attr_data) == input$attribute] <- "Property"
     
     # Calculate the maximum frequency for setting the range of the y-axis
-    max_frequency <- max(hist(female_attr_data$Property, breaks = 20, plot = FALSE)$counts,
-                         hist(male_attr_data$Property, breaks = 20, plot = FALSE)$counts)
+    if (input$gender == "F") {
+      max_frequency <- max(hist(female_attr_data$Property, breaks = 20, plot = FALSE)$counts)
+    } else if (input$gender == "M") {
+      max_frequency <- max(hist(male_attr_data$Property, breaks = 20, plot = FALSE)$counts)
+    } else {
+      max_frequency <- max(hist(female_attr_data$Property, breaks = 20, plot = FALSE)$counts,
+                           hist(male_attr_data$Property, breaks = 20, plot = FALSE)$counts)
+    }
+    
     
     # Create the bar plots for male and female
     plot_female <- plot_ly(
       female_attr_data, y = ~Property, type = "histogram", name = "Female",
-      histfunc = "count", marker = list(color = "rgba(255, 0, 0, 0.7)", line = list(color = bin_color(),width = 2)),
+      histfunc = "count", marker = list(color = "hotpink", line = list(color = bin_color(),width = 2)),
       nbinsy = 20
       ) %>%
       layout(
@@ -672,7 +746,7 @@ server = function(input, output, session) {
       )
     plot_male <- plot_ly(
       male_attr_data, y = ~Property, type = "histogram", name = "Male",
-      histfunc = "sum", marker = list(color = "rgba(0, 0, 255, 0.7)", line = list(color = bin_color(),width = 2)),
+      histfunc = "sum", marker = list(color = "royalblue", line = list(color = bin_color(),width = 2)),
       nbinsy = 20
       ) %>%
       layout(
