@@ -218,9 +218,20 @@ if (!"Bronze"%in% colnames(dataframe1)) {
   dataframe1$Bronze <- 0
 }
 
+#-------------------------------------------------------------------------------
+temp_data <- filtered_data
+values_select <- unique(temp_data[, c("NOC", "Team")])
+updateSelectizeInput(session, 'region_tize', 
+                     choices = setNames(values_select$NOC, values_select$Team), 
+                     server = TRUE)
+choices_data <- values_select$NOC
+names(choices_data) <- values_select$Team
+updatePickerInput(session, 'region',
+                  choices = choices_data
+)
 
-
-
+# Create new dataframe with unique NOC values
+new_df <- distinct(temp_data, NOC, .keep_all = TRUE)[, c("NOC", "Team")]
 
 
 

@@ -144,7 +144,11 @@ ui <- bootstrapPage(
             pickerInput(
               "region", "Team:",   
               choices = NULL, 
-              options = list(`actions-box` = TRUE, `none-selected-text` = "All Teams calculated!"),
+              options = list(
+                `actions-box` = TRUE,
+                `none-selected-text` = "All Teams calculated!",
+                `live-search`=TRUE
+                ),
               # selected = as.character(unique(medal_per_country[order(medal_per_country$rmedal),]$NOC))[1:10],
               multiple = TRUE
             ),
@@ -395,7 +399,9 @@ server = function(input, output, session) {
     if (is.null(input$region)){
       # Sort the dataframe by Country
       temp_data <- temp_data
-      values_select <- unique(temp_data[, c("NOC", "Team")])
+      
+      # https://stackoverflow.com/questions/73796404/pickerinput-names-and-values-from-dataframe-r-shiny
+      values_select <- distinct(temp_data, NOC, .keep_all = TRUE)[, c("NOC", "Team")]
       updatePickerInput(session, 'region',
                         choices = setNames(values_select$NOC, values_select$Team)
                         )
