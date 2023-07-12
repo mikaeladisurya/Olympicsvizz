@@ -22,6 +22,7 @@ if(!require(leaflet.minicharts)) install.packages ("leaflet.minicharts")
 if(!require(magrittr)) install.packages ("magrittr")
 if(!require(rgdal)) install.packages ("rgdal")
 if(!require(DT)) install.packages ("DT")
+if(!require(d3treeR)) devtools::install_github("timelyportfolio/d3treeR")
 
 library(shiny)
 library(shinythemes)
@@ -34,6 +35,7 @@ library(leaflet.minicharts)
 library(magrittr)
 library(rgdal)
 library(DT)
+library(d3treeR)
 
 ##----Prepare dataframe-------------------------------------------------------
 # world spatial polygon data frame
@@ -99,7 +101,11 @@ medal_avg_country <- medal_per_country %>%
 
 host_country <- merge(x = host_country, y = medal_avg_country, by = "Year", all.x = TRUE)
 
-minitest_data = read.csv("DATA/sales_minichart.csv",header=TRUE)
+##----Prepare dataframe for sport domination------------------------------------
+# medal per country in each sport
+medal_sport_country <- summer_olympic %>%    # Applying group_by & summarise
+  group_by(NOC, Sport) %>%
+  summarise(medal_count = sum(!is.na(Medal)))
 
 ### SHINY UI ###
 ui <- bootstrapPage(
@@ -230,13 +236,15 @@ ui <- bootstrapPage(
                           "Gold Rank"
               ),
               selected = "Medal Count"),
-            br(),
+            
             h3("-- Page Description --", align = "center"),
             tags$i(h6("Capitalizing on a nation's advantage can be achieved by hosting the Olympics on homeground,
             providing a unique opportunity to maximize their strengths and resources.
             We search to see any significant differences when a country become the Host of the Olympics.
             By visualizing and comparing the performance of host countries with other participants in the Olympics,
             we might see the correlation in hosting the Olympics with achieving bigger success."), style="color:#045a8d"),
+            
+            br(),
             h5(strong("Comparation of Host Achievement")),
             p("By visualizing the comparison of Host country with others in each event,
             we can see the difference in success in terms with other country or with their achievement before"),
@@ -247,6 +255,7 @@ ui <- bootstrapPage(
                 <li>Blue dot for the average achievement all participant on that Olympic Games</li>
                 <li>Grey dot for the other countries achievement</li>
               </ul>"),
+            
             h5(strong("Difference of Host Achievement")),
             p(""),
             HTML("<ul>
@@ -288,47 +297,62 @@ ui <- bootstrapPage(
       )
     ), # tabpanel
     
-    tabPanel("Region plots",
-             
-             sidebarLayout(
-               sidebarPanel(
-                 
-                 span(tags$i(h6("Reported cases are subject to significant variation in testing policy and capacity between countries.")), style="color:#045a8d"),
-                 span(tags$i(h6("Occasional anomalies (e.g. spikes in daily case counts) are generally caused by changes in case definitions.")), style="color:#045a8d"),
-                 
-                 pickerInput("level_select", "Level:",   
-                             choices = c("Global", "Continent", "Country", "US state"), 
-                             selected = c("Country"),
-                             multiple = FALSE),
-                 
-                 pickerInput("region_select", "Country/Region:",   
-                             choices = as.character(unique(summer_olympic$NOC)), 
-                             options = list(`actions-box` = TRUE, `none-selected-text` = "Please make a selection!"),
-                             selected = as.character(unique(medal_per_country[order(medal_per_country$rmedal),]$NOC))[1:10],
-                             multiple = TRUE), 
-                 
-                 pickerInput("outcome_select", "Outcome:",   
-                             choices = c("Deaths per million", "Cases per million", "Cases (total)", "Deaths (total)"), 
-                             selected = c("Deaths per million"),
-                             multiple = FALSE),
-                 
-                 pickerInput("start_date", "Plotting start date:",   
-                             choices = c("Date", "Week of 100th confirmed case", "Week of 10th death"), 
-                             options = list(`actions-box` = TRUE),
-                             selected = "Date",
-                             multiple = FALSE), 
-                 
-                 "Select outcome, regions, and plotting start date from drop-down menues to update plots. Countries with at least 1000 confirmed cases are included."
-               ),
-               
-               mainPanel(
-                 tabsetPanel(
-                   tabPanel("Cumulative", plotlyOutput("country_plot_cumulative")),
-                   tabPanel("New", plotlyOutput("country_plot")),
-                   tabPanel("Cumulative (log10)", plotlyOutput("country_plot_cumulative_log"))
-                 )
-               )
-             )
+    tabPanel(
+      "Sport Domination",
+      
+      sidebarLayout(
+        sidebarPanel(
+          
+          h3("-- Page Description --", align = "center"),
+          span(tags$i(h6("Sport domination for a country can serve as a leverage 
+                         to significantly contributed for their medal success 
+                         throughout Olympic history.")), style="color:#045a8d"),
+          span(tags$i(h6("Australia's unrivaled prowess in swimming,
+                         Jamaica's astounding track and field dominance,
+                         or The Soviet Union's historic domination in gymnastics.")), style="color:#045a8d"),
+          span(tags$i(h6("These examples demonstrate how countries that have invested
+                         in culture and development of athlete in particular sports have reaped 
+                         the rewards in the golden legacies of Olympics.")), style="color:#045a8d"),
+          
+          sliderInput(
+            inputId = "yearRange",
+            label = "Games Range",
+            min = min(host_country$Year),
+            max = max(host_country$Year),
+            value = c(min(host_country$Year), max(host_country$Year)),
+            post = " Games",
+            step = 4,
+            sep = "",
+            animate = TRUE
+          ),
+          
+          pickerInput("region_select", "Country/Region:",   
+                      choices = as.character(unique(summer_olympic$NOC)), 
+                      options = list(`actions-box` = TRUE, `none-selected-text` = "Please make a selection!"),
+                      selected = as.character(unique(medal_per_country[order(medal_per_country$rmedal),]$NOC))[1:10],
+                      multiple = TRUE), 
+          
+          pickerInput("outcome_select", "Outcome:",   
+                      choices = c("Deaths per million", "Cases per million", "Cases (total)", "Deaths (total)"), 
+                      selected = c("Deaths per million"),
+                      multiple = FALSE),
+          
+          pickerInput("start_date", "Plotting start date:",   
+                      choices = c("Date", "Week of 100th confirmed case", "Week of 10th death"), 
+                      options = list(`actions-box` = TRUE),
+                      selected = "Date",
+                      multiple = FALSE), 
+          
+          "Select outcome, regions, and plotting start date from drop-down menues to update plots. Countries with at least 1000 confirmed cases are included."
+        ),
+        
+        mainPanel(
+          tabsetPanel(
+            tabPanel("Sport", d3treeOutput("treemap_sport")),
+            tabPanel("Country", d3treeOutput("treemap_noc"))
+          )
+        )
+      )
     ),
     
     tabPanel(
@@ -896,5 +920,40 @@ server = function(input, output, session) {
         legend = list(orientation = 'h')
       )
   })
+  
+  #----TREE MAP---------------------------------------------------------------
+  # Create treemap for sport
+  output$treemap_sport <- renderD3tree3({
+    
+    # Sport Treemap
+    sport_3map <- treemap(
+      medal_sport_country,
+      index = c("Sport", "NOC"),
+      vSize = "medal_count",
+      type = "index"
+    )
+    
+    sport_i3map <- d3tree2( sport_3map ,  rootname = "Sport" )
+    
+    sport_i3map
+    
+  }) # treemap for sport
+  
+  # Create treemap for NOC
+  output$treemap_noc <- renderD3tree2({
+    
+    # Sport Treemap
+    noc_3map <- treemap(
+      medal_sport_country,
+      index = c("NOC", "Sport"),
+      vSize = "medal_count",
+      type = "index"
+    )
+    
+    noc_i3map <- d3tree2( noc_3map ,  rootname = "Team" )
+    
+    noc_i3map
+    
+  }) # treemap for country
 }
 shinyApp(ui, server)
