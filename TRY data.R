@@ -118,3 +118,75 @@ if (nrow(filter_height) > 0) {
 }
 
 # ----------------------------------------------------------------------
+
+age_bar <- data.frame(Age = 10:75)
+
+
+male_hist <- hist(filtered_data$Age, breaks = 64, plot = FALSE)
+
+filtered_data %>% 
+  mutate(population = ifelse(Sex == "M", yes = population*(-1), no = population*1)) %>%
+  mutate(abs_pop = abs(population)) %>%
+  plot_ly(x= ~population, y=~age, color=~Sex) %>% 
+  add_bars(orientation = 'h', hoverinfo = 'text', text = ~abs_pop) %>%
+  layout(bargap = 0.1, barmode = 'overlay',
+         xaxis = list(tickmode = 'array', tickvals = c(-15000, -10000, -5000, 0, 5000, 10000, 15000),
+                      ticktext = c('15000', '10000', '5000', '0', '5000', '10000', '15000')))
+
+
+# Filter the data for male and female players
+male_data <- subset(filtered_data, Sex == "M")
+female_data <- subset(filtered_data, Sex == "F")
+
+# Calculate the maximum frequency for setting the range of the y-axis
+max_frequency <- max(hist(male_data$Age, plot = FALSE)$counts, hist(female_data$Age, plot = FALSE)$counts)
+
+# Create the bar plots for male and female
+plot_female <- plot_ly(female_data, y = ~Age, type = "histogram",
+                       histfunc = "count", marker = list(color = "rgba(255, 0, 0, 0.7)"),
+                       nbinsy = 15)%>%
+  add_trace(male_data, y = ~Age, 
+            histfunc = "sum", marker = list(color = "rgba(0, 0, 255, 0.7)"),
+            nbinsy = 15) %>%
+  layout(
+    title = "Age Distribution of Players",
+    xaxis = list(title = "Frequency", range = c(0, max_frequency)),
+    yaxis = list(title = "Age"),
+    bargap = 0.1, barmode = 'overlay',
+    legend = list(x = 0.1, y = 0.9)
+  )
+
+plot_female
+# Customize the layout (optional)
+
+# Combine the bar plots and layout
+plot_ly(plot_female, plot_male) 
+
+
+plot_overlay <- plot_ly(alpha = 0.6)
+
+plot_overlay <- plot_overlay %>% add_histogram(y = male_data$Age, histfunc = "count", nbinsy = 15)
+
+plot_overlay <- plot_overlay %>% add_histogram(y = female_data$Age, histfunc = "count", nbinsy = 15)
+
+plot_overlay <- plot_overlay %>% layout(barmode = "overlay", 
+                                        xaxis = list(title = "Frequency", autorange = "reversed")
+                                        )
+
+plot_overlay
+
+male_data <- subset(filtered_data, Sex == "M")
+attr_data <- filtered_data[, c("Age", "Sex")]
+colnames(attr_data)[colnames(attr_data) == "Age"] <- "Property"
+
+temp_data <- filtered_data[filtered_data$Sex == "M", ]
+temp_data <- temp_data[rowSums(!is.na(temp_data)) > 0, ]
+
+female_attr_data <- subset(filtered_data, Sex == "F")
+female_attr_data <- female_attr_data[, c("Age", "Sex")]
+colnames(female_attr_data)[colnames(female_attr_data) == "Age"] <- "Property"
+
+max_frequency <- max(hist(female_attr_data$Property, breaks = 20, plot = FALSE)$counts)
+
+
+

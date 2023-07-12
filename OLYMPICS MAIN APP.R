@@ -183,14 +183,14 @@ ui <- bootstrapPage(
           ),
           
           absolutePanel(
-            id = "histogram", class = "panel panel-default",
+            id = "histogram_panel", class = "panel panel-default",
             top = "44%", right = "1%", width = 400, fixed=TRUE,
             draggable = TRUE, height = "auto",
-            HTML('<button data-toggle="collapse" data-target="#demo" class="btn btn-link btn-block">'),
-            textOutput("histogram_medal_title"), 
+            HTML('<button data-toggle="collapse" data-target="#histo_attr_div" class="btn btn-link btn-block">'),
+            textOutput("histogram_attr_title"), 
             HTML('</button>'),
-            tags$div(id = 'demo',  class="collapse in",
-                     plotlyOutput("histogram_medal")
+            tags$div(id = 'histo_attr_div',  class="collapse in",
+                     plotlyOutput("histogram_attr")
             )
           )
           
@@ -639,25 +639,57 @@ server = function(input, output, session) {
     
   })# output renderleaflet choropleth
   
-  #----HISTOGRAM----------------------------------------------------------------
-  output$histogram_medal_title <- renderText({
-    paste(input$attribute, "'s Distribution of ", input$medal, " Winners")
+  #----HISTOGRAM ATTR----------------------------------------------------------------
+  # https://stackoverflow.com/questions/36202824/plotly-in-r-setting-ranges-on-axis-with-reversed-autorange
+  output$histogram_attr_title <- renderText({
+    paste(input$attribute, "'s Distribution of ", input$medal, " Winner")
   })
   
-  output$histogram_medal <- renderPlotly({
+  output$histogram_attr <- renderPlotly({
     
-    # produce the histogram
-    plot_ly(data = filtered_data(), x = ~filtered_data()[[input$attribute]], 
-            type = "histogram", nbinsx = 30, 
-            marker = list(color = bin_color(), line = list(color = "cadetblue",width = 2)),hoverinfo = 'text',
-            text = ~paste('</br> Age: ', Age,
-                          '</br> Count: ', Age)
-            ) %>%
+    # Filter the data for male and female players
+    female_attr_data <- subset(filtered_data(), Sex == "F")
+    female_attr_data <- female_attr_data[, c(input$attribute, "Sex")]
+    colnames(female_attr_data)[colnames(female_attr_data) == input$attribute] <- "Property"
+    
+    male_attr_data <- subset(filtered_data(), Sex == "M")
+    male_attr_data <- male_attr_data[, c(input$attribute, "Sex")]
+    colnames(male_attr_data)[colnames(male_attr_data) == input$attribute] <- "Property"
+    
+    # Calculate the maximum frequency for setting the range of the y-axis
+    max_frequency <- max(hist(female_attr_data$Property, breaks = 20, plot = FALSE)$counts,
+                         hist(male_attr_data$Property, breaks = 20, plot = FALSE)$counts)
+    
+    # Create the bar plots for male and female
+    plot_female <- plot_ly(
+      female_attr_data, y = ~Property, type = "histogram", name = "Female",
+      histfunc = "count", marker = list(color = "rgba(255, 0, 0, 0.7)", line = list(color = bin_color(),width = 2)),
+      nbinsy = 20
+      ) %>%
       layout(
-        xaxis = list(title = input$attribute),
-        yaxis = list(title = "Count")
+        xaxis = list(range = c(max_frequency, 0)),
+        bargap = 0.1
+      )
+    plot_male <- plot_ly(
+      male_attr_data, y = ~Property, type = "histogram", name = "Male",
+      histfunc = "sum", marker = list(color = "rgba(0, 0, 255, 0.7)", line = list(color = bin_color(),width = 2)),
+      nbinsy = 20
+      ) %>%
+      layout(
+        xaxis = list(range = c(0, max_frequency)),
+        bargap = 0.1
       )
     
+    # Customize the layout (optional)
+    
+    # Combine the bar plots and layout
+    subplot(plot_female, plot_male, nrows = 1, shareY = TRUE,
+            margin = 0) %>%
+      layout(
+        xaxis = list(title = "Frequency"),
+        yaxis = list(title = input$attribute),
+        legend = list(x = 0.1, y = 0.9)
+      )
     
   }) # output renderplotly histogram
   ##---/Histogram---------------------------------------------------------------

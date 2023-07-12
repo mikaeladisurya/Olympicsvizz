@@ -69,6 +69,22 @@ h1, h2, h3, h4 { font-weight: 400; }
   transition-delay: 0;
 }
 
+#histogram_panel {
+  /* Appearance */
+  background-color: white;
+  padding: 0 10px 10px 10px;
+  cursor: move;
+  /* Fade out while not hovering */
+  opacity: 0.55;
+  transition: opacity 500ms 1s;
+}
+
+#histogram_panel:hover {
+  /* Fade in while hovering */
+  opacity: 0.9;
+  transition-delay: 0;
+}
+
 #logo {
   /* Appearance */
   background-color: transparent;
