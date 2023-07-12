@@ -131,21 +131,6 @@ ui <- bootstrapPage(
               sep = "",
               animate = TRUE
             ),
-            radioButtons(
-              "attribute", 
-              "Select Attribute:",
-              choices = c("Age", "Height", "Weight", "BMI"),
-              selected = "Age",
-              inline = TRUE),
-            selectInput(
-              "medal", 
-              "Choose Medal Type:",
-              choices = c("Bronze", "Silver", "Gold", "All Medals"),
-              selected = "All Medals"),
-            selectInput(
-              "gender", "Choose Gender:",
-              choices = c("F", "M", "All"),
-              selected = "All"),
             selectizeInput(
               "sport", 
               "Select Sport",
@@ -156,23 +141,28 @@ ui <- bootstrapPage(
                 plugins = list('remove_button')
               )
             ),
-            selectizeInput(
-              "region", 
-              "Select Team",
-              choices = NULL,
-              multiple = TRUE,
-              options = list(
-                placeholder = 'All Team',
-                plugins = list('remove_button')
-              )
-            ),
             pickerInput(
-              "region_select", "Country/Region:",   
+              "region", "Team:",   
               choices = NULL, 
               options = list(`actions-box` = TRUE, `none-selected-text` = "All Teams calculated!"),
               # selected = as.character(unique(medal_per_country[order(medal_per_country$rmedal),]$NOC))[1:10],
               multiple = TRUE
-            )
+            ),
+            selectInput(
+              "medal", 
+              "Choose Medal Type:",
+              choices = c("Bronze", "Silver", "Gold", "All Medals"),
+              selected = "All Medals"),
+            selectInput(
+              "gender", "Choose Gender:",
+              choices = c("F", "M", "All"),
+              selected = "All"),
+            radioButtons(
+              "attribute", 
+              "Select Attribute:",
+              choices = c("Age", "Height", "Weight", "BMI"),
+              selected = "Age",
+              inline = TRUE)
           ),
           
           absolutePanel(
@@ -406,12 +396,7 @@ server = function(input, output, session) {
       # Sort the dataframe by Country
       temp_data <- temp_data
       values_select <- unique(temp_data[, c("NOC", "Team")])
-      updateSelectizeInput(session, 'region', 
-                           choices = setNames(values_select$NOC, values_select$Team), 
-                           server = TRUE)
-      choices_data <- values_select$NOC
-      names(choices_data) <- values_select$Team
-      updatePickerInput(session, 'region_select',
+      updatePickerInput(session, 'region',
                         choices = setNames(values_select$NOC, values_select$Team)
                         )
     } else {
@@ -549,7 +534,8 @@ server = function(input, output, session) {
     # #----Start plotting for Choropleth-----------------------------------
     base_choro <- leaflet(world_spdf) %>% 
       addTiles()  %>% 
-      setView( lat=10, lng=0 , zoom=2)
+      setView( lat=10, lng=0 , zoom=2)%>%
+      addProviderTiles(providers$CartoDB.Positron)
     ## ----AGE-------------------------------------------------------------
     if (input$attribute == "Age") {
       mybins <- c(NA, 18, 20, 22, 24, 26, 28, 30, Inf)
@@ -563,8 +549,8 @@ server = function(input, output, session) {
         sep="") %>%
         lapply(htmltools::HTML)
       
-      # Final Map
-      base_choro %>%
+      # Add Choropleth
+      base_choro <- base_choro %>%
         addPolygons( 
           fillColor = ~mypalette(Age), 
           stroke=TRUE, 
@@ -578,13 +564,6 @@ server = function(input, output, session) {
             textsize = "13px", 
             direction = "auto"
           )
-        ) %>%
-        addMinicharts(
-          world_spdf@data$LON, world_spdf@data$LAT,
-          type = "pie", chartdata = pie_chartdata, 
-          fillColor = pie_color, colorPalette = pie_color, opacity = 0.8,
-          width = 60 * sqrt(world_spdf@data$Total_Medals) / sqrt(max(world_spdf@data$Total_Medals)),
-          transitionTime = 750, legendPosition = "bottomleft"
         ) %>%
         addLegend( pal=mypalette, values=~count, opacity=0.9, title = "Age (Years)", position = "bottomleft" )
       
@@ -601,8 +580,8 @@ server = function(input, output, session) {
         sep="") %>%
         lapply(htmltools::HTML)
       
-      # Final Map
-      base_choro %>%
+      # Add Choropleth
+      base_choro <- base_choro %>%
         addPolygons( 
           fillColor = ~mypalette(Height), 
           stroke=TRUE, 
@@ -616,14 +595,7 @@ server = function(input, output, session) {
             textsize = "13px", 
             direction = "auto"
           )
-        ) %>%
-        addMinicharts(
-          world_spdf@data$LON, world_spdf@data$LAT,
-          type = "pie", chartdata = pie_chartdata, 
-          fillColor = pie_color, colorPalette = pie_color, opacity = 0.8,
-          width = 60 * sqrt(world_spdf@data$Total_Medals) / sqrt(max(world_spdf@data$Total_Medals)),
-          transitionTime = 750, legendPosition = "bottomleft"
-        ) %>%
+        )%>%
         addLegend( pal=mypalette, values=~count, opacity=0.9, title = "Height (cm)", position = "bottomleft" )
       
       ## ----WEIGHT-------------------------------------------------------------
@@ -639,8 +611,8 @@ server = function(input, output, session) {
         sep="") %>%
         lapply(htmltools::HTML)
       
-      # Final Map
-      base_choro %>%
+      # Add Choropleth
+      base_choro <- base_choro %>%
         addPolygons( 
           fillColor = ~mypalette(Weight), 
           stroke=TRUE, 
@@ -654,13 +626,6 @@ server = function(input, output, session) {
             textsize = "13px", 
             direction = "auto"
           )
-        ) %>%
-        addMinicharts(
-          world_spdf@data$LON, world_spdf@data$LAT,
-          type = "pie", chartdata = pie_chartdata, 
-          fillColor = pie_color, colorPalette = pie_color, opacity = 0.8,
-          width = 60 * sqrt(world_spdf@data$Total_Medals) / sqrt(max(world_spdf@data$Total_Medals)),
-          transitionTime = 750, legendPosition = "bottomleft"
         ) %>%
         addLegend( pal=mypalette, values=~count, opacity=0.9, title = "Weight (Kg)", position = "bottomleft" )
       
@@ -677,8 +642,8 @@ server = function(input, output, session) {
         sep="") %>%
         lapply(htmltools::HTML)
       
-      # Final Map
-      base_choro %>%
+      # Add Choropleth
+      base_choro <- base_choro %>%
         addPolygons( 
           fillColor = ~mypalette(BMI), 
           stroke=TRUE, 
@@ -693,16 +658,21 @@ server = function(input, output, session) {
             direction = "auto"
           )
         ) %>%
-        addMinicharts(
-          world_spdf@data$LON, world_spdf@data$LAT,
-          type = "pie", chartdata = pie_chartdata, 
-          fillColor = pie_color, colorPalette = pie_color, opacity = 0.8,
-          width = 60 * sqrt(world_spdf@data$Total_Medals) / sqrt(max(world_spdf@data$Total_Medals)),
-          transitionTime = 750, legendPosition = "bottomleft"
-        ) %>%
         addLegend( pal=mypalette, values=~count, opacity=0.9, title = "BMI (Kg/M2)", position = "bottomleft" )
     }
     
+    # Add mini piechart
+    base_choro <- base_choro %>%
+      addMinicharts(
+        world_spdf@data$LON, world_spdf@data$LAT,
+        type = "pie", chartdata = pie_chartdata, 
+        fillColor = pie_color, colorPalette = pie_color, opacity = 0.8,
+        width = 60 * sqrt(world_spdf@data$Total_Medals) / sqrt(max(world_spdf@data$Total_Medals)),
+        transitionTime = 750, legendPosition = "bottomleft"
+      )
+    
+    # show map
+    base_choro
     
   })# output renderleaflet choropleth
   
@@ -746,7 +716,6 @@ server = function(input, output, session) {
                              hist(male_attr_data$Property, breaks = 20, plot = FALSE)$counts)
       }
     }
-    
     
     # Create the bar plots for male and female
     plot_female <- plot_ly(
