@@ -54,9 +54,6 @@ country_code <- read.csv(paste0(getwd(),"/DATA/alphabetic_country_codes.csv"))
 # join athlete data with country codes to add iso3 country code
 summer_olympic <-  merge(x = summer_olympic, y = country_code, by = "NOC", all.x = TRUE)
 
-# delete NA row in ISO column
-summer_olympic <- summer_olympic[!is.na(summer_olympic$ISO),]
-
 # Loading host_medal data
 host_country <- read.csv(paste0(getwd(),"/DATA/host_medal.csv"))
 # Add a new column with the difference as host and before it
@@ -102,10 +99,25 @@ medal_avg_country <- medal_per_country %>%
 host_country <- merge(x = host_country, y = medal_avg_country, by = "Year", all.x = TRUE)
 
 ##----Prepare dataframe for sport domination------------------------------------
+# medal per country in each games
+medal_per_sport <- summer_olympic %>%    # Applying group_by & summarise
+  group_by(Sport, Year) %>%
+  summarise(cmedal = sum(!is.na(Medal)),
+            cgold = sum(Medal == "Gold", na.rm = TRUE),
+            csilver = sum(Medal == "Silver", na.rm = TRUE),
+            cbronze = sum(Medal == "Bronze", na.rm = TRUE))
+
 # medal per country in each sport
 medal_sport_country <- summer_olympic %>%    # Applying group_by & summarise
-  group_by(NOC, Sport) %>%
+  group_by(NOC, Team, Sport, Year) %>%
   summarise(medal_count = sum(!is.na(Medal)))
+
+picker_value <- summer_olympic[!is.na(summer_olympic$Medal),]
+picker_value <- data.frame(
+  NOC = picker_value$NOC,
+  Region = ifelse(!is.na(picker_value$Country), picker_value$Country, picker_value$Team)
+)
+picker_value <- distinct(picker_value, NOC, .keep_all = TRUE)[, c("NOC", "Region")]
 
 ### SHINY UI ###
 ui <- bootstrapPage(
@@ -315,7 +327,7 @@ ui <- bootstrapPage(
                          the rewards in the golden legacies of Olympics.")), style="color:#045a8d"),
           
           sliderInput(
-            inputId = "yearRange",
+            inputId = "game_range_sport",
             label = "Games Range",
             min = min(host_country$Year),
             max = max(host_country$Year),
@@ -326,30 +338,31 @@ ui <- bootstrapPage(
             animate = TRUE
           ),
           
-          pickerInput("region_select", "Country/Region:",   
-                      choices = as.character(unique(summer_olympic$NOC)), 
-                      options = list(`actions-box` = TRUE, `none-selected-text` = "Please make a selection!"),
+          pickerInput("region_select_sport", "Select Team:",   
+                      choices = setNames(picker_value$NOC, picker_value$Region),
+                      options = list(
+                        `actions-box` = TRUE,
+                        `none-selected-text` = "Default Teams Calculated!",
+                        `live-search`=TRUE),
                       selected = as.character(unique(medal_per_country[order(medal_per_country$rmedal),]$NOC))[1:10],
-                      multiple = TRUE), 
+                      multiple = TRUE),
           
-          pickerInput("outcome_select", "Outcome:",   
-                      choices = c("Deaths per million", "Cases per million", "Cases (total)", "Deaths (total)"), 
-                      selected = c("Deaths per million"),
-                      multiple = FALSE),
-          
-          pickerInput("start_date", "Plotting start date:",   
-                      choices = c("Date", "Week of 100th confirmed case", "Week of 10th death"), 
-                      options = list(`actions-box` = TRUE),
-                      selected = "Date",
-                      multiple = FALSE), 
+          pickerInput("sport_select_sport", "Select Sport:",   
+                      choices = sort(unique(medal_per_sport$Sport)), 
+                      options = list(
+                        `actions-box` = TRUE,
+                        `none-selected-text` = "Default Sport Calculated!",
+                        `live-search`=TRUE),
+                      selected = as.character(unique(medal_per_sport[order(-medal_per_sport$cmedal),]$Sport))[1:10],
+                      multiple = TRUE),
           
           "Select outcome, regions, and plotting start date from drop-down menues to update plots. Countries with at least 1000 confirmed cases are included."
         ),
         
         mainPanel(
           tabsetPanel(
-            tabPanel("Sport", d3treeOutput("treemap_sport")),
-            tabPanel("Country", d3treeOutput("treemap_noc"))
+            tabPanel("Sport", d3tree2Output("treemap_sport", width = "100%")),
+            tabPanel("Team", d3tree2Output("treemap_noc", width = "100%"))
           )
         )
       )
@@ -394,6 +407,9 @@ server = function(input, output, session) {
   ##----Reactive filter for athlete page----------------------------------------
   filtered_data <- reactive({
     
+    # delete NA row in ISO column (no ISO, cannot map into world spdf)
+    summer_olympic <- summer_olympic[!is.na(summer_olympic$ISO),]
+    
     # filter main data based on medal selected
     if (input$medal == "All Medals") {
       temp_data <- summer_olympic[!is.na(summer_olympic$Medal),]
@@ -432,6 +448,7 @@ server = function(input, output, session) {
     } else {
       temp_data <- temp_data[temp_data$NOC %in% input$region, ]
     }
+    
     # filtered data will be equal to temp_data
     temp_data
   })
@@ -921,18 +938,54 @@ server = function(input, output, session) {
       )
   })
   
-  #----TREE MAP---------------------------------------------------------------
-  # Create treemap for sport
-  output$treemap_sport <- renderD3tree3({
+##----Reactive filter for 3rd page---------------------------------------------
+  # filter  sport country based on game slider
+  filtered_sportnoc <- reactive({
+    temp_sportnoc <- medal_sport_country[medal_sport_country$Year >= input$game_range_sport[1] & medal_sport_country$Year <= input$game_range_sport[2], ]
     
-    # Sport Treemap
+    # filter data based on sport selected
+    if (is.null(input$sport_select_sport)){
+      # #update sport_select_sport
+      # updatePickerInput(session, 'sport_select_sport', choices = sort(unique(temp_sportnoc$Sport))
+      # )
+      temp_sportnoc <- temp_sportnoc[temp_sportnoc$Sport %in% c("Swimming", "Athletics", "Gymnastics"), ]
+    } else {
+      temp_sportnoc <- temp_sportnoc[temp_sportnoc$Sport %in% input$sport_select_sport, ]
+    }
+
+    # filter data based on team selected
+    if (is.null(input$region_select_sport)){
+      # #update region_select_sport
+      # values_select <- temp_sportnoc[!duplicated(temp_sportnoc[,c('NOC')]),][, c("NOC", "Team")]
+      # updatePickerInput(session, 'region_select_sport',
+      #                   choices = setNames(values_select$NOC, values_select$Team)
+      # )
+      temp_sportnoc <- temp_sportnoc[temp_sportnoc$NOC %in% c("AUS", "JAM", "USR"), ]
+    } else {
+      temp_sportnoc <- temp_sportnoc[temp_sportnoc$NOC %in% input$region_select_sport, ]
+    }
+    
+    temp_sportnoc <- temp_sportnoc %>%    # Applying group_by & summarise
+      group_by(NOC, Sport) %>%
+      summarise(medal_count = sum(medal_count))
+    
+    temp_sportnoc
+  })
+  
+  #----TREE MAP---------------------------------------------------------------
+  # https://rquer.netlify.app/interactive_chart/treemaps_2#treemap
+  # Create treemap for sport
+  output$treemap_sport <- renderD3tree2({
+    
+    # Basic sport Treemap
     sport_3map <- treemap(
-      medal_sport_country,
+      filtered_sportnoc(),
       index = c("Sport", "NOC"),
       vSize = "medal_count",
       type = "index"
     )
     
+    # interactive sport treemamp
     sport_i3map <- d3tree2( sport_3map ,  rootname = "Sport" )
     
     sport_i3map
@@ -942,14 +995,15 @@ server = function(input, output, session) {
   # Create treemap for NOC
   output$treemap_noc <- renderD3tree2({
     
-    # Sport Treemap
+    # basic noc Treemap
     noc_3map <- treemap(
-      medal_sport_country,
+      filtered_sportnoc(),
       index = c("NOC", "Sport"),
       vSize = "medal_count",
       type = "index"
     )
     
+    # interactive noc treemap
     noc_i3map <- d3tree2( noc_3map ,  rootname = "Team" )
     
     noc_i3map
