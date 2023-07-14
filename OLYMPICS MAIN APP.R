@@ -22,6 +22,7 @@ if(!require(leaflet.minicharts)) install.packages ("leaflet.minicharts")
 if(!require(magrittr)) install.packages ("magrittr")
 if(!require(rgdal)) install.packages ("rgdal")
 if(!require(DT)) install.packages ("DT")
+if(!require(treemap)) install.packages ("treemap")
 if(!require(d3treeR)) devtools::install_github("timelyportfolio/d3treeR")
 
 library(shiny)
@@ -35,6 +36,7 @@ library(leaflet.minicharts)
 library(magrittr)
 library(rgdal)
 library(DT)
+library(treemap)
 library(d3treeR)
 
 ##----Prepare dataframe-------------------------------------------------------
@@ -110,7 +112,8 @@ medal_per_sport <- summer_olympic %>%    # Applying group_by & summarise
 # medal per country in each sport
 medal_sport_country <- summer_olympic %>%    # Applying group_by & summarise
   group_by(NOC, Team, Sport, Year) %>%
-  summarise(medal_count = sum(!is.na(Medal)))
+  summarise(medal_count = sum(!is.na(Medal)),
+            athlete_count = sum(!is.na(ID)))
 
 picker_value <- summer_olympic[!is.na(summer_olympic$Medal),]
 picker_value <- data.frame(
@@ -356,7 +359,8 @@ ui <- bootstrapPage(
                       selected = as.character(unique(medal_per_sport[order(-medal_per_sport$cmedal),]$Sport))[1:10],
                       multiple = TRUE),
           
-          "Select outcome, regions, and plotting start date from drop-down menues to update plots. Countries with at least 1000 confirmed cases are included."
+          p("This visualization provide the ratio of medal gain by sport / team.
+            The higher the ratio, the better overall athlete contingent that been sent by respecive team.")
         ),
         
         mainPanel(
@@ -796,7 +800,6 @@ server = function(input, output, session) {
       )
     
   }) # output renderplotly histogram
-  ##---/Histogram---------------------------------------------------------------
   
   ##----Reactive filter for host page-------------------------------------------
   # filter host based on game slider
@@ -960,14 +963,18 @@ server = function(input, output, session) {
       # updatePickerInput(session, 'region_select_sport',
       #                   choices = setNames(values_select$NOC, values_select$Team)
       # )
-      temp_sportnoc <- temp_sportnoc[temp_sportnoc$NOC %in% c("AUS", "JAM", "USR"), ]
+      temp_sportnoc <- temp_sportnoc[temp_sportnoc$NOC %in% c("AUS", "JAM", "URS"), ]
     } else {
       temp_sportnoc <- temp_sportnoc[temp_sportnoc$NOC %in% input$region_select_sport, ]
     }
     
     temp_sportnoc <- temp_sportnoc %>%    # Applying group_by & summarise
       group_by(NOC, Sport) %>%
-      summarise(medal_count = sum(medal_count))
+      summarise(medal_sum = sum(medal_count),
+                athlete_sum = sum(athlete_count),
+                medal_ratio = sum(medal_count)/sum(athlete_count))%>%
+      mutate(noc_ratio=paste(NOC, paste(medal_sum, athlete_sum, sep ="/"), sep ="\n"))%>%
+      mutate(sport_ratio=paste(Sport, paste(medal_sum, athlete_sum, sep ="/"), sep ="\n"))
     
     temp_sportnoc
   })
@@ -980,8 +987,8 @@ server = function(input, output, session) {
     # Basic sport Treemap
     sport_3map <- treemap(
       filtered_sportnoc(),
-      index = c("Sport", "NOC"),
-      vSize = "medal_count",
+      index = c("Sport", "noc_ratio"),
+      vSize = "medal_ratio",
       type = "index"
     )
     
@@ -998,8 +1005,8 @@ server = function(input, output, session) {
     # basic noc Treemap
     noc_3map <- treemap(
       filtered_sportnoc(),
-      index = c("NOC", "Sport"),
-      vSize = "medal_count",
+      index = c("NOC", "sport_ratio"),
+      vSize = "medal_ratio",
       type = "index"
     )
     
