@@ -56,6 +56,10 @@ country_code <- read.csv(paste0(getwd(),"/DATA/alphabetic_country_codes.csv"))
 # join athlete data with country codes to add iso3 country code
 summer_olympic <-  merge(x = summer_olympic, y = country_code, by = "NOC", all.x = TRUE)
 
+#----Add Region to summerolympics-----------------------------------------------
+summer_olympic <- summer_olympic %>%
+  mutate(Region=ifelse(!is.na(summer_olympic$Country), summer_olympic$Country, summer_olympic$Team))
+
 # Loading host_medal data
 host_country <- read.csv(paste0(getwd(),"/DATA/host_medal.csv"))
 # Add a new column with the difference as host and before it
@@ -111,24 +115,21 @@ medal_per_sport <- summer_olympic %>%    # Applying group_by & summarise
 
 # medal per country in each sport
 medal_sport_country <- summer_olympic %>%    # Applying group_by & summarise
-  group_by(NOC, Team, Sport, Year) %>%
+  group_by(NOC, Region, Sport, Year) %>%
   summarise(medal_count = sum(!is.na(Medal)),
             athlete_count = sum(!is.na(ID)))
 
 picker_value <- summer_olympic[!is.na(summer_olympic$Medal),]
-picker_value <- data.frame(
-  NOC = picker_value$NOC,
-  Region = ifelse(!is.na(picker_value$Country), picker_value$Country, picker_value$Team)
-)
 picker_value <- distinct(picker_value, NOC, .keep_all = TRUE)[, c("NOC", "Region")]
 
-### SHINY UI ###
+##----SHINY UI----------------------------------------------------------
 ui <- bootstrapPage(
   navbarPage(
     theme = shinytheme("flatly"), collapsible = TRUE,
     HTML('<a style="text-decoration:none;cursor:default;color:#FFFFFF;" class="active" href="#">Olympics in Visualization</a>'), id="nav",
     windowTitle = "Olympics History",
     
+    ##----1st page tab----------------------------------------------------------
     tabPanel(
       "Athlete Characteristic",
       div(class="outer",
@@ -214,11 +215,16 @@ ui <- bootstrapPage(
             tags$div(id = 'histo_attr_div',  class="collapse in",
                      plotlyOutput("histogram_attr")
             )
-          )
+          ),
+          
+          absolutePanel(id = "logo", class = "card", bottom = 20, left = 150, width = 30, fixed=TRUE, draggable = FALSE, height = "auto",
+                        actionButton("twitter_share", label = "", icon = icon("linkedin"),style='padding:5px',
+                                     onclick = sprintf("window.open('%s')", "https://www.linkedin.com/in/mikaeladisurya/")))
           
       ) #/div
     ), # tabpanel
     
+    ##----2nd page tab----------------------------------------------------------
     tabPanel(
       "Host Countries",
       tags$div(
@@ -312,6 +318,7 @@ ui <- bootstrapPage(
       )
     ), # tabpanel
     
+    ##----3rd page tab----------------------------------------------------------
     tabPanel(
       "Sport Domination",
       
@@ -361,17 +368,57 @@ ui <- bootstrapPage(
           
           p("This visualization provide the ratio of medal gain by sport / team.
             The higher the ratio, the better overall athlete contingent that been sent by respecive team.")
-        ),
+        ), # sidebar panel sidebar layout
         
         mainPanel(
           tabsetPanel(
-            tabPanel("Sport", d3tree2Output("treemap_sport", width = "100%")),
-            tabPanel("Team", d3tree2Output("treemap_noc", width = "100%"))
+            tabPanel(
+              "Sport", 
+              titlePanel(
+                h3("NUMBERS OF ATHLETE AND MEDAL COUNT RATIO", align = "center")
+              ),
+              wellPanel(
+                d3tree2Output("treemap_sport", width = "100%"),
+                HTML(
+                  "<ul>
+                    <li>Click to Zoom into each section</li>
+                    <li>Double click to Zoom out</li>
+                 </ul>"
+                )
+              )
+            ),
+            tabPanel(
+              "Team",
+              titlePanel(
+                h3("NUMBERS OF ATHLETE AND MEDAL COUNT RATIO", align = "center")
+              ),
+              wellPanel(
+                d3tree2Output("treemap_noc", width = "100%"),
+                HTML(
+                  "<ul>
+                    <li>Click to Zoom into each section</li>
+                    <li>Double click to Zoom out</li>
+                 </ul>"
+                )
+              ),
+              wellPanel(
+                plotlyOutput("scatter_noc"),
+                br(),
+                HTML(
+                  "<ul>
+                    <li>Hover to see tooltips</li>
+                    <li>Select area to Zoom in and double click to zoom out</li>
+                    <li>Click on each Legend to remove or add the series to the chart</li>
+                 </ul>"
+                )
+              )
+            )
           )
-        )
-      )
+        ) # main panel sidebar layout
+      ) # sidebar layout
     ),
     
+    ##----4th page tab----------------------------------------------------------
     tabPanel(
       "About this site",
       tags$div(
@@ -398,17 +445,25 @@ ui <- bootstrapPage(
         tags$a(href="https://www.kaggle.com/datasets/heesoo37/120-years-of-olympic-history-athletes-and-results", "120 years of Olympic history: athletes and results"),tags$br(),
         tags$b("Spatial Data for Choropleth: "), 
         tags$a(href="https://thematicmapping.org/downloads/world_borders.php", "World Borders Dataset"),tags$br(),
+        tags$b("Dashboard UI: "), 
+        tags$a(href="https://github.com/rstudio/shiny/blob/v1.7.4/R/bootstrap.R", "Shiny Bootstrap"),(", "),
+        tags$a(href="https://vac-lshtm.shinyapps.io/ncov_tracker/", "COVID-19 tracker"),tags$br(),
         tags$br(),tags$br(),tags$h4("Contact"),
         "mikael.adisurya@gmail.com",tags$br(),tags$br()
-      )
+      ),
+      
+      absolutePanel(id = "logo", class = "card", bottom = 20, left = 20, width = 30, fixed=TRUE, draggable = FALSE, height = "auto",
+                    actionButton("twitter_share", label = "", icon = icon("linkedin"),style='padding:5px',
+                                 onclick = sprintf("window.open('%s')", "https://www.linkedin.com/in/mikaeladisurya/")))
     ) # tabpanel
     
   )# navbarpage
 ) # bootsrapPage
 
+##----SERVER--------------------------------------------------------------------
 server = function(input, output, session) {
   
-  ##----Reactive filter for athlete page----------------------------------------
+##----Reactive filter for 1st page----------------------------------------
   filtered_data <- reactive({
     
     # delete NA row in ISO column (no ISO, cannot map into world spdf)
@@ -727,7 +782,7 @@ server = function(input, output, session) {
     
   })# output renderleaflet choropleth
   
-  #----HISTOGRAM ATTR----------------------------------------------------------------
+  #----HISTOGRAM----------------------------------------------------------------
   # https://stackoverflow.com/questions/36202824/plotly-in-r-setting-ranges-on-axis-with-reversed-autorange
   output$histogram_attr_title <- renderText({
     paste(input$attribute, "'s Distribution of ", input$medal, " Winner")
@@ -801,7 +856,7 @@ server = function(input, output, session) {
     
   }) # output renderplotly histogram
   
-  ##----Reactive filter for host page-------------------------------------------
+##----Reactive filter for 2nd page-------------------------------------------
   # filter host based on game slider
   filtered_host <- reactive({
     host_country[host_country$Year >= input$yearRange[1] & host_country$Year <= input$yearRange[2], ]
@@ -903,7 +958,7 @@ server = function(input, output, session) {
       )
   }) # line chart host country
   
-  #----SCATTER PLOT----------------------------------------------------------
+  #----SCATTER PLOT HOST COUNTRY----------------------------------------------------------
   output$scatter_host <- renderPlotly({
     
     # Create the scatter plot using Plotly for other countries with gray color
@@ -972,9 +1027,15 @@ server = function(input, output, session) {
       group_by(NOC, Sport) %>%
       summarise(medal_sum = sum(medal_count),
                 athlete_sum = sum(athlete_count),
-                medal_ratio = sum(medal_count)/sum(athlete_count))%>%
+                medal_ratio = sum(medal_count)/sum(athlete_count),
+                Region=paste(Region))%>%
       mutate(noc_ratio=paste(NOC, paste(medal_sum, athlete_sum, sep ="/"), sep ="\n"))%>%
-      mutate(sport_ratio=paste(Sport, paste(medal_sum, athlete_sum, sep ="/"), sep ="\n"))
+      mutate(sport_ratio=paste(Sport, paste(medal_sum, athlete_sum, sep ="/"), sep ="\n"))%>%
+      mutate(ratio_category = case_when(
+        medal_ratio >= 0.7 ~ "High",
+        medal_ratio > 0.4 & medal_ratio < 0.7 ~ "Mid",
+        medal_ratio <= 0.4 ~ "Low"
+      ))
     
     temp_sportnoc
   })
@@ -993,7 +1054,7 @@ server = function(input, output, session) {
     )
     
     # interactive sport treemamp
-    sport_i3map <- d3tree2( sport_3map ,  rootname = "Sport" )
+    sport_i3map <- d3tree2( sport_3map ,  rootname = "Sport Ratio Treemap" )
     
     sport_i3map
     
@@ -1011,10 +1072,50 @@ server = function(input, output, session) {
     )
     
     # interactive noc treemap
-    noc_i3map <- d3tree2( noc_3map ,  rootname = "Team" )
+    noc_i3map <- d3tree2( noc_3map ,  rootname = "Team Ratio Treemap" )
     
     noc_i3map
     
   }) # treemap for country
+  
+  #----SCATTER PLOT SPORT NOC---------------------------------------------------
+  output$scatter_noc <- renderPlotly({
+    
+    # set separator line for high,mid,low category
+    y <- c(0,max(filtered_sportnoc()$medal_sum))
+    line_high <- c(0,max(filtered_sportnoc()$medal_sum)*100/70)
+    line_mid <- c(0,max(filtered_sportnoc()$medal_sum)*100/40)
+    
+    # Create the scatter plot by determine the layout first, then add other traces
+    plot_ly(y = ~y) %>%
+      layout(
+        xaxis = list(range = c(0, max(filtered_sportnoc()$athlete_sum)))
+      ) %>% 
+      add_lines(x = ~line_high, name = "High Line",
+                line = list(
+                  shape = "linear",
+                  color = 'darkgreen')
+      ) %>%
+      add_lines(x = ~line_mid, name = "Mid Line",
+                line = list(
+                  shape = "linear",
+                  color = 'saddlebrown')
+      ) %>%
+      add_trace(data = filtered_sportnoc(), x = ~athlete_sum, y = ~medal_sum,
+                color = ~ratio_category,
+                marker = list(size = 10,
+                              line = list(color = ~ratio_category,
+                                          width = 2)),
+                opacity = 0.6,
+                # Hover text:
+                text = ~paste("Team:", Region, '<br>Sport:', Sport))%>% 
+      layout(
+        xaxis = list(title = "<br>Numbers of Athlete"),
+        yaxis = list(title = paste("Medal Count")),
+        title = paste("Ratio Between Numbers of Athlete and Medal Count"),
+        legend = list(orientation = 'h')
+      )
+
+  })
 }
 shinyApp(ui, server)
