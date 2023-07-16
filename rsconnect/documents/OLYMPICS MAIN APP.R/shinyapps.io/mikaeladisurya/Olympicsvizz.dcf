@@ -1,0 +1,14 @@
+name: Olympicsvizz
+title: Olympicsvizz
+username:
+account: mikaeladisurya
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 9462687
+bundleId: 7462052
+url: https://mikaeladisurya.shinyapps.io/Olympicsvizz/
+when: 1689504416.98395
+lastSyncTime: 1689504416.98396
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: .gitattributes

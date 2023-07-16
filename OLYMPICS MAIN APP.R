@@ -10,20 +10,20 @@
 # https://shiny.posit.co/r/reference/shiny/0.11/reactivevalues
 # https://towardsdatascience.com/lollipop-dumbbell-charts-with-plotly-696039d5f85
 
-# Install necessary libraries
-if(!require(shiny)) install.packages ("shiny")
-if(!require(shinythemes)) install.packages ("shinythemes")
-if(!require(shinyWidgets)) install.packages ("shinyWidgets")
-if(!require(plotly)) install.packages ("plotly")
-if(!require(dplyr)) install.packages ("dplyr")
-if(!require(tidyverse)) install.packages ("tidyverse")
-if(!require(leaflet)) install.packages ("leaflet")
-if(!require(leaflet.minicharts)) install.packages ("leaflet.minicharts")
-if(!require(magrittr)) install.packages ("magrittr")
-if(!require(rgdal)) install.packages ("rgdal")
-if(!require(DT)) install.packages ("DT")
-if(!require(treemap)) install.packages ("treemap")
-if(!require(d3treeR)) devtools::install_github("timelyportfolio/d3treeR")
+# # Install necessary libraries
+# if(!require(shiny)) install.packages ("shiny")
+# if(!require(shinythemes)) install.packages ("shinythemes")
+# if(!require(shinyWidgets)) install.packages ("shinyWidgets")
+# if(!require(plotly)) install.packages ("plotly")
+# if(!require(dplyr)) install.packages ("dplyr")
+# if(!require(tidyverse)) install.packages ("tidyverse")
+# if(!require(leaflet)) install.packages ("leaflet")
+# if(!require(leaflet.minicharts)) install.packages ("leaflet.minicharts")
+# if(!require(magrittr)) install.packages ("magrittr")
+# if(!require(rgdal)) install.packages ("rgdal")
+# if(!require(DT)) install.packages ("DT")
+# if(!require(treemap)) install.packages ("treemap")
+# if(!require(d3treeR)) devtools::install_github("timelyportfolio/d3treeR")
 
 library(shiny)
 library(shinythemes)
@@ -41,7 +41,7 @@ library(d3treeR)
 
 ##----Prepare dataframe-------------------------------------------------------
 # world spatial polygon data frame
-world_spdf <- readOGR(paste0(getwd(),"\\DATA\\world_shape_file\\"), 
+world_spdf <- readOGR(paste0(getwd(),"/DATA/"), 
                       "TM_WORLD_BORDERS_SIMPL-0.3",
                       verbose=FALSE
 )
